@@ -612,6 +612,21 @@ function updateFileFilter() {
   if (cur) sel.value = cur;
 }
 
+function parseDate(str) {
+  if (!str) return null;
+  // Handle M/D/YYYY, MM/DD/YYYY, YYYY-MM-DD, and similar
+  const s = str.toString().trim();
+  const d = new Date(s);
+  if (!isNaN(d)) return d;
+  // Try MM/DD/YYYY explicitly
+  const parts = s.split('/');
+  if (parts.length === 3) {
+    const [m, day, y] = parts;
+    return new Date(+y, +m - 1, +day);
+  }
+  return null;
+}
+
 function applyFilters() {
   const search   = document.getElementById('search').value.toLowerCase();
   const prod     = document.getElementById('fProduct').value;
@@ -622,11 +637,18 @@ function applyFilters() {
   const fee      = document.getElementById('fFee').checked;
   const dups     = document.getElementById('fDups').checked;
 
+  const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+  const toTs   = dateTo   ? new Date(dateTo + 'T23:59:59').getTime() : null;
+
   filteredRows = allRows.filter(r => {
     if (search && !`${r.sn} ${r.description} ${r.verify} ${r.rma} ${r.product}`.toLowerCase().includes(search)) return false;
     if (prod   && r.product.toString() !== prod) return false;
-    if (dateFrom && r.reqDate && r.reqDate < dateFrom) return false;
-    if (dateTo   && r.reqDate && r.reqDate > dateTo)   return false;
+    if (fromTs || toTs) {
+      const rDate = parseDate(r.reqDate);
+      const rTs   = rDate ? rDate.getTime() : null;
+      if (fromTs && (!rTs || rTs < fromTs)) return false;
+      if (toTs   && (!rTs || rTs > toTs))   return false;
+    }
     if (fileF  && r.sourceFile !== fileF) return false;
     if (issues && !(r.verify && r.verify.trim().length > 10)) return false;
     if (fee    && !(r.restoreFee && r.restoreFee.toString().trim())) return false;
